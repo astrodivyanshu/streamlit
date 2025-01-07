@@ -4,7 +4,7 @@ from datetime import datetime
 import pandas as pd
 import re
 
-# Previous PURPOSE_OPTIONS dictionary remains the same...
+# Previous dictionaries remain the same
 PURPOSE_OPTIONS = {
     'general': 'General',
     'stability': 'Stability',
@@ -28,6 +28,11 @@ PURPOSE_OPTIONS = {
     'overthinking': 'Overthinking'
 }
 
+SUGGESTION_TYPES = {
+    'moon': 'Moon Based',
+    'manifest': 'Manifest Based'
+}
+
 def is_valid_time(time_str):
     """Validate time string in 24-hour format (HH:MM)"""
     pattern = re.compile(r'^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$')
@@ -42,7 +47,7 @@ def format_time(time_str):
     return time_str
 
 def create_card_html(name, image_url, info, product_url):
-    # Previous card HTML creation function remains the same...
+    # Previous card HTML creation function remains the same
     return f"""
         <div style="
             border: 1px solid #ddd;
@@ -81,15 +86,21 @@ def create_card_html(name, image_url, info, product_url):
         </div>
     """
 
-def call_rudraksha_api(date, time, name, purpose):
+def call_rudraksha_api(date, time, name, purpose, suggestion_type):
     """Call the Rudraksha recommendation API"""
     base_url = "https://api.astroarunpandit.org/get-recommended-rudraksha"
     
     formatted_date = format_date(date)
-    formatted_time = format_time(time)
     encoded_name = requests.utils.quote(name)
     
-    url = f"{base_url}?date={formatted_date}&time={formatted_time}&name={encoded_name}"
+    # Build URL without time if not provided
+    url = f"{base_url}?date={formatted_date}&name={encoded_name}&chart_type={suggestion_type}"
+    
+    # Add time parameter only if provided
+    if time:
+        formatted_time = format_time(time)
+        url += f"&time={formatted_time}"
+        
     if purpose != 'general':
         url += f"&purpose={purpose}"
     
@@ -121,53 +132,58 @@ def main():
     col1, col2 = st.columns(2)
     
     with col1:
-        name = st.text_input("Enter Name", "Dev Gupta")
-        date = st.date_input("Select Date", datetime(1999, 8, 1))
-        
-    with col2:
-        # Time input with validation
-        time_input = st.text_input(
-            "Enter Time (24-hour format HH:MM)", 
-            "12:05",
-            help="Enter time in 24-hour format (e.g., 13:30 for 1:30 PM)"
+        suggestion_type = st.selectbox(
+            "Select Suggestion Type",
+            options=list(SUGGESTION_TYPES.keys()),
+            format_func=lambda x: SUGGESTION_TYPES[x],
+            index=0
         )
         
-        # Purpose dropdown with formatted display names
+        # Time input section with checkbox
+        unknown_time = st.checkbox("I don't know the birth time")
+        time_input = None
+        if not unknown_time:
+            time_input = st.text_input(
+                "Enter Time (24-hour format HH:MM)", 
+                "12:05",
+                help="Enter time in 24-hour format (e.g., 13:30 for 1:30 PM)"
+            )
+        
+        # Purpose dropdown
         purpose_display_name = st.selectbox(
             "Select Purpose",
             options=list(PURPOSE_OPTIONS.keys()),
             format_func=lambda x: PURPOSE_OPTIONS[x],
             index=0
         )
+        
+    with col2:
+        date = st.date_input("Select Date", datetime(1999, 8, 1))
+        name = st.text_input("Enter Name", "Dev Gupta")
     
-    # Validate time format
-    if not is_valid_time(time_input):
-        st.error("Please enter a valid time in 24-hour format (HH:MM)")
-        return
+    # Validate time format if time is provided
+    if time_input and not unknown_time:
+        if not is_valid_time(time_input):
+            st.error("Please enter a valid time in 24-hour format (HH:MM)")
+            return
         
     if st.button("Get Recommendation"):
         with st.spinner("Fetching recommendation..."):
-            result = call_rudraksha_api(date, time_input, name, purpose_display_name)
+            # Pass None as time if unknown_time is checked
+            result = call_rudraksha_api(
+                date, 
+                None if unknown_time else time_input, 
+                name, 
+                purpose_display_name,
+                suggestion_type
+            )
             
             if 'error' not in result:
-                # Display selected purpose
-                st.info(f"Selected Purpose: {PURPOSE_OPTIONS[purpose_display_name]}")
-                
-                # Display Moon Information
-                st.subheader("Moon Details")
-                moon_data = pd.DataFrame({
-                    'Parameter': ['Nakshatra', 'Lord'],
-                    'Value': [result['moon']['nakshatra'], result['moon']['lord']]
-                })
-                st.table(moon_data)
-                
-                # Display House Information
-                st.subheader("House Details")
-                house_data = pd.DataFrame({
-                    'Parameter': ['Rashi', 'Lord'],
-                    'Value': [result['House11th']['rashi'], result['House11th']['rashilord']]
-                })
-                st.table(house_data)
+                # Display selected options
+                if unknown_time:
+                    st.info(f"Suggestion Type: {SUGGESTION_TYPES[suggestion_type]} | Purpose: {PURPOSE_OPTIONS[purpose_display_name]} | Time: Not Provided")
+                else:
+                    st.info(f"Suggestion Type: {SUGGESTION_TYPES[suggestion_type]} | Purpose: {PURPOSE_OPTIONS[purpose_display_name]} | Time: {time_input}")
                 
                 # Display Rudraksha Recommendations
                 st.subheader("Recommended Rudrakshas")
