@@ -2,8 +2,9 @@ import streamlit as st
 import requests
 from datetime import datetime
 import pandas as pd
+import re
 
-# Purpose options with formatted display names
+# Previous PURPOSE_OPTIONS dictionary remains the same...
 PURPOSE_OPTIONS = {
     'general': 'General',
     'stability': 'Stability',
@@ -27,16 +28,21 @@ PURPOSE_OPTIONS = {
     'overthinking': 'Overthinking'
 }
 
+def is_valid_time(time_str):
+    """Validate time string in 24-hour format (HH:MM)"""
+    pattern = re.compile(r'^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$')
+    return bool(pattern.match(time_str))
+
 def format_date(date):
     """Convert date to required format YYYY/MM/DD"""
     return date.strftime('%Y/%m/%d')
 
-def format_time(time):
-    """Convert time to required format HH:MM"""
-    return time.strftime('%H:%M')
+def format_time(time_str):
+    """Return the time string as is since it's already in HH:MM format"""
+    return time_str
 
 def create_card_html(name, image_url, info, product_url):
-    """Create HTML for a Rudraksha card"""
+    # Previous card HTML creation function remains the same...
     return f"""
         <div style="
             border: 1px solid #ddd;
@@ -83,7 +89,6 @@ def call_rudraksha_api(date, time, name, purpose):
     formatted_time = format_time(time)
     encoded_name = requests.utils.quote(name)
     
-    # Include purpose in the API call if it's not 'general'
     url = f"{base_url}?date={formatted_date}&time={formatted_time}&name={encoded_name}"
     if purpose != 'general':
         url += f"&purpose={purpose}"
@@ -120,7 +125,13 @@ def main():
         date = st.date_input("Select Date", datetime(1999, 8, 1))
         
     with col2:
-        time = st.time_input("Select Time", datetime(2023, 1, 1, 12, 5).time())
+        # Time input with validation
+        time_input = st.text_input(
+            "Enter Time (24-hour format HH:MM)", 
+            "12:05",
+            help="Enter time in 24-hour format (e.g., 13:30 for 1:30 PM)"
+        )
+        
         # Purpose dropdown with formatted display names
         purpose_display_name = st.selectbox(
             "Select Purpose",
@@ -128,10 +139,15 @@ def main():
             format_func=lambda x: PURPOSE_OPTIONS[x],
             index=0
         )
+    
+    # Validate time format
+    if not is_valid_time(time_input):
+        st.error("Please enter a valid time in 24-hour format (HH:MM)")
+        return
         
     if st.button("Get Recommendation"):
         with st.spinner("Fetching recommendation..."):
-            result = call_rudraksha_api(date, time, name, purpose_display_name)
+            result = call_rudraksha_api(date, time_input, name, purpose_display_name)
             
             if 'error' not in result:
                 # Display selected purpose
@@ -149,7 +165,7 @@ def main():
                 st.subheader("House Details")
                 house_data = pd.DataFrame({
                     'Parameter': ['Rashi', 'Lord'],
-                    'Value': [result['House11th']['rashi'], result['House11th']['lord']]
+                    'Value': [result['House11th']['rashi'], result['House11th']['rashilord']]
                 })
                 st.table(house_data)
                 
