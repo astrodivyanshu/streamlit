@@ -70,7 +70,7 @@ def create_card_html(name, image_url, info, product_url):
                     border-radius: 4px;
                     margin: 10px 0;
                 ">
-                <p style="color: #666;">Planet: {info}</p>
+                
             </div>
             <div style="margin-top: 10px;">
                 <a href="{product_url}" target="_blank" style="
